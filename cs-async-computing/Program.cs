@@ -11,6 +11,7 @@ namespace cs_async_computing
     {
         // private delegate UInt64 AsyncSumDel(UInt64 n);
         private delegate UInt64 AsyncFibDel(UInt64 n);
+        private static volatile int count = 0;
         static void Main(string[] args)
         {
             /*AsyncSumDel del = Sum;
@@ -36,7 +37,7 @@ namespace cs_async_computing
                 del.BeginInvoke(35, EndSum, del);
             IAsyncResult ar3 =
                 del.BeginInvoke(30, EndSum, del);*/
-
+            DoWork();
             Console.ReadKey();
         }
 
@@ -65,13 +66,17 @@ namespace cs_async_computing
             return Fib(n);
         }*/
 
-        private static IAsyncResult BuildTask(ulong pos, string tag, List<int> localResult)
+        private static IAsyncResult BuildTask(ulong pos, string tag, List<string> localResult)
         {
             AsyncFibDel del = Fib;
             return del.BeginInvoke(pos, (ar) => {
                 AsyncFibDel func = (AsyncFibDel)ar.AsyncState;
                 UInt64 res = func.EndInvoke(ar);
                 Console.WriteLine($"pos = {pos}; tag = {tag}; res = {res}");
+                lock (localResult)
+                {
+                    localResult.Add(tag);
+                }
             }, del);
         }
 
@@ -80,14 +85,24 @@ namespace cs_async_computing
            
             for (int i = 0; i < 100; i++)
             {
-                List<int> localResults = new List<int>();
+                List<string> localResults = new List<string>();
                 IAsyncResult ar1 =
-                    BuildTask(40, "A", localResults);
+                    BuildTask(30, "A", localResults);
                 IAsyncResult ar2 =
-                    BuildTask(35, "B", localResults);
+                    BuildTask(25, "B", localResults);
                 IAsyncResult ar3 =
-                    BuildTask(30, "C", localResults);
+                    BuildTask(20, "C", localResults);
+                while (localResults.Count != 3)
+                {
+                    Thread.Sleep(10);
+                }
+                if (localResults[0] == "C" && localResults[1] == "B" && localResults[2] == "A")
+                {
+                    Interlocked.Increment(ref count);
+                    // Console.WriteLine("hit");
+                }
             }
+            Console.WriteLine($"count = {count}");
         }
 
         /*private static void EndSum(IAsyncResult ar)
